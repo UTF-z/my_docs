@@ -6,4 +6,4 @@
 - 网络
 - 编程语言
 - 硬件
-	-[Jetson Nano启动和连接](jetson_nano.md)
+	- [Jetson Nano启动和连接](jetson_nano.md)
