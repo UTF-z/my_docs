@@ -1,7 +1,9 @@
 - 用户软件/实用工具
-	- [docsify](docsify.md)
+	- [Docsify](docsify.md)
 	- [GitHub Pages](github_pages.md)
 - 系统/系统软件
 	- [Linux相关问题](Linux.md)
 - 网络
 - 编程语言
+- 硬件
+	-[Jetson Nano启动和连接](jetson_nano.md)
