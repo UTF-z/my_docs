@@ -2,6 +2,8 @@
 	- [Docsify](docsify.md)
 	- [GitHub Pages](github_pages.md)
 	- [Git](git.md)
+	- [Pytorch](pytorch.md)
+	- [Hugging Face](huggingface.md)
 - 系统/系统软件
 	- [Linux相关问题](Linux.md)
 - 网络
