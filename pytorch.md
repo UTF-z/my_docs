@@ -120,5 +120,10 @@ Torch的自动求导是根据计算图从根结点反向传播实现的。只有
 
 对于非叶子结点，可以进行in-place操作，当时backward的时候会报错，这是通过校对张量的`_version`字段实现的。
 
+### 源码分析
+[一个好文](https://hurray0.com/menu/152/)
+
+### 自定义autograd.function
+[一个好文](https://zhuanlan.zhihu.com/p/344802526)
 
 
