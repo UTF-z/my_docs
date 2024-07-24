@@ -1,3 +1,42 @@
+<style type="text/css">
+    h1 { counter-reset: h2counter; }
+    h2 { counter-reset: h3counter; }
+    h3 { counter-reset: h4counter; }
+    h4 { counter-reset: h5counter; }
+    h5 { counter-reset: h6counter; }
+    h6 { }
+    h2::before {
+      counter-increment: h2counter;
+      content: counter(h2counter) ".\0000a0\0000a0";
+    }
+    h3::before {
+      counter-increment: h3counter;
+      content: counter(h2counter) "."
+                counter(h3counter) ".\0000a0\0000a0";
+    }
+    h4::before {
+      counter-increment: h4counter;
+      content: counter(h2counter) "."
+                counter(h3counter) "."
+                counter(h4counter) ".\0000a0\0000a0";
+    }
+    h5::before {
+      counter-increment: h5counter;
+      content: counter(h2counter) "."
+                counter(h3counter) "."
+                counter(h4counter) "."
+                counter(h5counter) ".\0000a0\0000a0";
+    }
+    h6::before {
+      counter-increment: h6counter;
+      content: counter(h2counter) "."
+                counter(h3counter) "."
+                counter(h4counter) "."
+                counter(h5counter) "."
+                counter(h6counter) ".\0000a0\0000a0";
+    }
+</style>
+
 # HTML 语法基础
 
 ## HTML 基本格式
@@ -106,6 +145,20 @@
         <li>列表项</li>
     </ol>
     ```
+    列表可以控制计数，从1开始，或者从特定数字开始。
+    - start属性
+      ```html
+      <ol start="4">
+      ```
+    - reversed属性
+      ```html
+      <ol start="4" reversed>
+      ```
+    - value属性
+      value 属性允许设置列表项指定数值
+      ```html
+      <li value="2">
+      ```
 - 定义列表
     定义列表是用来定义术语的。
     定义列表的格式如下：
