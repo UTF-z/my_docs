@@ -281,6 +281,7 @@ element1 ~ element2 { /* 选择所有 element2 元素，且 element2 是 element
 - CSS替代盒子模型：`box-sizing: border-box`:
 盒子边框总宽度 = width.
 高度同理
+
 ## 数值与单位
 
 ### 数字、长度和百分比
