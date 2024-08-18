@@ -55,6 +55,11 @@
             4px 4px 5px rgba(0, 0, 0, 0.7),
             0px 0px 7px rgba(0, 0, 0, 0.4);
     }
+    img {
+      display: block;
+      margin: 0 auto;
+      align: center;
+    }
 </style>
 # CSS 语法基础
 
@@ -281,6 +286,113 @@ element1 ~ element2 { /* 选择所有 element2 元素，且 element2 是 element
 - CSS替代盒子模型：`box-sizing: border-box`:
 盒子边框总宽度 = width.
 高度同理
+
+### 常规流布局
+- 块级元素行向宽度和父级元素行向相同，高度由内容决定。
+- 行级元素宽度高度均由内容决定。
+- 外边距折叠：如果两个垂直相邻的元素都设置了外边距并且两个外边距相接触，那么更大的外边距会被保留，小的则会消失(还有[更多规则](https://developer.mozilla.org/zh-CN/docs/Web/CSS/CSS_box_model/Mastering_margin_collapsing))。
+
+### 弹性布局
+<img src="imgs/flex_model.png" alt="弹性盒子模型">
+
+#### 弹性盒子
+- 通过设置`display: flex`来创建弹性盒子。
+- 通过设置`flex-direction`来控制主轴方向。
+  - row: 水平方向
+  - row-reverse: 水平反向
+  - column: 垂直方向
+  - column-reverse: 垂直反向
+- 通过设置`flex-wrap`来控制flex item换行行为。
+  - nowrap: 不换行
+  - wrap: 换行
+  - wrap-reverse: 反向换行
+- `flex-flow`: 是`flex-direction`和`flex-wrap`的简写。
+  ```css
+  flex-flow: row wrap;
+  /* 等价于 */
+  flex-direction: row;
+  flex-wrap: wrap;
+  ```
+- `align-items`控制flex项在交叉轴上的位置。
+  - `stretch`：默认, 即高度等于flex容器的高度
+  - `center`：每个项保持原有高度，并在交叉轴居中。
+  - `flex-start`：每个项保持原有高度，并在交叉轴起始位置。
+  - `flex-end`：每个项保持原有高度，并在交叉轴末尾位置。
+- `justify-content`控制flex项在主轴上的位置。
+  - `flex-start`：每个项保持原有高度，并在主轴起始位置。
+  - `flex-end`：每个项保持原有高度，并在主轴末尾位置。
+  - `center`：每个项保持原有高度，并在主轴居中。
+  - `space-between`：每个项保持原有高度，并在主轴两端对齐，两端不留空隙，item之间的间距平均分布。
+  - `space-around`：和上面一样，但是在两端之间也要留空。
+  - `space-evenly`：每个项保持原有高度，并在主轴两端对齐，两端和item之间的间距相等。
+
+#### 弹性项
+- 通过设置`flex`来启用弹性项，并控制弹性项沿主轴方向的宽度比。
+  ```css
+  article {
+    flex: 1 200px;
+  }
+  /* 含义是每个弹性项的宽度为200px，如果有剩余空间，则按照第一个值确定的比例分配，直到总宽度达到100%。*/
+  ```
+- 通过设置`order`来为弹性项规定顺序，可以是负值。优先按照`order`值从小到大排列。相同则按照DOM顺序排列。**所有弹性项默认order为0**
+
+### 网格布局
+
+#### 网格盒子
+- 通过设置`display: grid`来创建网格盒子。子元素按照先行后列的顺序填充。
+- 通过设置`grid-template-columns`来确定网格列宽，可以是一般长度，也可以是`fr`，表示可用空间的份数。多个重复宽度配置可以换成`repeat(<n>, <track-size>)`。`<track-size>`可以是多个空格分隔的长度值。
+- 通过设置`grid-template-rows`来确定网格行高，和上面类似。
+- `grid-auto-rows` 和 `grid-auto-columns` 属性可以设置网格的自动行高和列宽。
+上面的值还可以使用`minmax(<min>, <max>)`函数来指定最小值和最大值。里面的值可以是auto。一个`trick`是使用`auto-fill`关键字
+- 使用 `grid-column-gap` 属性来定义列间隙；使用 `grid-row-gap` 来定义行间隙；使用 `grid-gap` 可以同时设定两者，不能用`fr`。
+
+#### 基于线的放置
+可以通过`grid-column`和`grid-row`来指定元素的放置位置。比如
+```css
+grid-column: 1 / 3;
+```
+表示从第一根列线开始到第三根列线结束。可以用负数来表示倒数第几根线。这只保证对于显式网格的正确性。
+
+#### 基于区域的放置
+可以通过在网格盒子里设置`grid-template-areas`来定义网格区域，然后通过`grid-area`来指定元素放置的区域。比如
+```css
+.container {
+  display: grid;
+  grid-template-areas:
+    "header header"
+    "sidebar content"
+    "footer footer";
+  grid-template-columns: 1fr 3fr;
+  gap: 20px;
+}
+
+header {
+  grid-area: header;
+}
+
+article {
+  grid-area: content;
+}
+
+aside {
+  grid-area: sidebar;
+}
+
+footer {
+  grid-area: footer;
+}
+```
+这里有几个要点：
+
+- 你需要填满网格的每个格子
+- 对于某个横跨多个格子的元素，重复写上那个元素grid-area属性定义的区域名字
+- 所有名字只能出现在一个连续的区域，不能在不同的位置出现
+- 一个连续的区域必须是一个矩形
+- 使用.符号，让一个格子留空
+
+
+
+
 
 ## 数值与单位
 

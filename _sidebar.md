@@ -13,3 +13,5 @@
 - 编程语言
 - 硬件
 	- [Jetson Nano启动和连接](jetson_nano.md)
+- 旅行
+	- [厦门20240816](xiamen.md)
