@@ -4,6 +4,7 @@
 	- [Git](git.md)
 	- [Pytorch](pytorch.md)
 	- [Hugging Face](huggingface.md)
+	- [Windows系统VSCode C/C++开发环境配置指南](VSCode4CppOnWindows.md)
 - 系统/系统软件
 	- [Linux相关问题](Linux.md)
 - 网络
