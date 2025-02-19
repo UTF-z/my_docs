@@ -1,12 +1,5 @@
 <head>
 <style>
-    .tech-tutorial {
-        font-family: 'Segoe UI', Consolas, monospace;
-        padding: 2rem;
-        border-radius: 10px;
-        border: 1px solid #00ff9d;
-        box-shadow: 0 0 20px rgba(0, 255, 157, 0.1);
-    }
     h1 {
         text-align: center;
     }
@@ -56,7 +49,6 @@
 </style>
 </head>
 
-<div class="tech-tutorial">
 
 # 🚀 Windows系统VSCode C/C++开发环境配置指南
 <figure src=figures/banner.jpg class='banner'>
@@ -165,7 +157,6 @@ int main() {
 
 <div class="warning">
 ⚠️ 常见问题排查：  
-</div>
 
 1. “报错说找不到一个明明存在的路径” → 检查所有路径是否含中文  
 
