@@ -161,6 +161,22 @@ inputs_embeds = inputs_embeds.masked_scatter(image_mask, image_embeds)
 
 现在我们把融合之后的`inputs_embeds`送给Qwen2VLModel进行计算，在forward里面会先根据`position_ids`计算好`rotary_emb`，然后一层层送入decode layer进行一次SdpaAttention，具体的类是[Qwen2VLSdpaAttention](https://github.com/huggingface/transformers/blob/main/src/transformers/models/qwen2_vl/modeling_qwen2_vl.py#L729)。
 
+> 我们之前计算的`position_ids`形状为`[3, 1, seqlen]`，首先我们会在`Qwen2VLRotaryEmbedding`类里面计算`positional_embedding`，具体就是首先得到一个`self.inv_freq`，形状为`[3, 1, dim=64]`，然后和`position_ids`做outter product，最后一维复制一遍，再取cos和sin，一并返回，维度均为`[3, 1, seqlen, 128]`
+
+> 在SpdaAttention里面，首先计算QKV，这里KV的头数其实是`num_heads`的一个因数，Q不变，是为GQA。然后通过`apply_multimodal_rotary_pos_emb`[函数](https://github.com/huggingface/transformers/blob/main/src/transformers/models/qwen2_vl/modeling_qwen2_vl.py#L171)根据`position_embeddings`对QK进行位置编码。注意这里的细节：我们之前计算的`position_ids`是按照thw的顺序在第一个维度cat起来的。所以现在的`position_embeddings`也是这个顺序。
+
+> Qwen认为，64维的`inv_freq`里面，一部分角度编码t，一部分角度编码h，一部分角度编码w。这个分割做在`config.mrope_section`里面。去看一下就知道，他设定的值为`[16, 24, 24]`。由于我们把虚部都统一放在维度的后一半儿，并且把cos，sin复制了一遍，所以也要先把`mrope_section`复制一遍，变成`[16, 24, 24, 16, 24, 24]`。接着分割cos和sin的最后一维，并按照`[t, h, w, t, h, w]`的顺序在第一维上选，重新在最后一维上拼接，并扩展head group的维度。最终形成`[B, 1, seqlen, 128]`的cos和sin。（不是，这也不是三位Rotary啊？正儿八经的三位Rotary应该是`[tθ, hθ, wθ]`的cos和sin来搞吧，它这是`[tθ[:16], hθ[17:40], wθ[41: 64]]`的cos和sin搞的）
+
+```python
+cos = torch.cat([m[i % 3] for i, m in enumerate(cos.split(mrope_section, dim=-1))], dim=-1).unsqueeze(
+    unsqueeze_dim
+)
+sin = torch.cat([m[i % 3] for i, m in enumerate(sin.split(mrope_section, dim=-1))], dim=-1).unsqueeze(
+    unsqueeze_dim
+)
+```
+> Anyway，我们根据cos和sin就可以愉快地套公式编码了，编完之后返回QK。接着我们会把KV拿去**更新KV Cache**，KV Cache的update方法会返回拼上了缓存值的全量KV。随后把KV的Head Group展开（interleave_repeat）就可以拿去和Q做SpdaAttention啦~
+
 每一层都会对QK进行位置编码，随后对KV Cache进行update，接着进行GQA，把头拼好，返回output和新的KV Cache。
 
 
