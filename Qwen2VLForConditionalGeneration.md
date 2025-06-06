@@ -4,23 +4,30 @@
 在调用模型之前，Processor会先把文本和图像处理好，我们先来看看图像预处理过程：
 
 ### 图像预处理
-假设每张图像大小为`720*1140*3`。每张图经过Image Processor的
-[smart_resize](https://github.com/huggingface/transformers/blob/main/src/transformers/models/qwen2_vl/image_processing_qwen2_vl.py#L155)，图像的长宽都会变成`patch_size=14`的倍数并添加batch维度，即`1*3*1428*728`，然后图像会**在时间维度上被复制一份**，并变成patches，维度为`5304*1176=(1 * (1428/14)*(728/14))*(3*2*14*14)`，
-前面的维度是grid大小`（t_grid, w_grid, h_grid）`，后面的维度就是一个patch的大小`（channel，temporal，w，h）`。
+假设每张图像(numpy格式)大小为`1420 * 720 *3` (HWC)。每张图经过Image Processor的如下操作:
 
-假设我们有2张图片，那么每个图片都会被[复制一份](https://github.com/huggingface/transformers/blob/main/src/transformers/models/qwen2_vl/image_processing_qwen2_vl.py#L374)（这里很神奇啊，可能是bug）。
-最后每个patch会在第一个维度上拼起来，最终形成一个`10608*1176`的`pixel_values`。（相当于4张图的patch量）
+1. [smart_resize](https://github.com/huggingface/transformers/blob/main/src/transformers/models/qwen2_vl/image_processing_qwen2_vl.py#L155)，图像的长宽都会变成`factor=grid_size * merge_size = 14 * 2`的倍数, 即`1428*728*3`.
+2. 把图像的通道维度换到第二维, 并且添加时间维度, 即`(1, 3, 1428, 728)`. 
+3. 在时间维度上复制一份, 变成`(2, 3, 1428, 728)`，记为`(t, c, H, W)`
+4. 网格化, 时间维度一格是两张图, H维度一格是两个patch, 一个patch14个像素, W和H一样. 现在shape变为(1, 2, 3, grid_h // 2, 2, 14, grid_w // 2, 2, 14), 记为`(t, t_patch_size, c, h // merge_size, merge_size, patch_size, w // merge_size, merge_size, patch_size)`
+5. 调整view, 变成`(t, h // merge_size, w // merge_size, merge_size, merge_size, c, t_patch_size, patch_size, patch_size)`
+6. thw和后面的`merge_size * merge_size`乘起来, 后三组也乘起来, 变成`(t*h*w, 3*2*14*14=1176)`
 
-同时我们能够拿到`image_grid_thw`，即每个图片的grid尺寸`（t_grid, w_grid, h_grid）`。
+同时我们拿到每个图片的grid尺寸`（t, h, w）`。
+
+Image Processor最后返回两个东西:
+
+1. pixel_values: (n, 1176), 是每个图片单独的patches在第一个维度上extend起来的东西
+2. image_grid_thw: (N, 3), N是图片张数, 这个东西包含每个图片的thw值.
 
 ### 文本预处理
 假设我们的文本是`a b c d <|vision_start|><|image_pad|><|vision_end|> e f g <|vision_start|><|image_pad|><|vision_end|>`，在
-处理的时候，`<|image_pad|>`会被替换成`w_grid // MERGE_SIZE, h_grid // MERGE_SIZE`个`<|placeholder|>`，最后tokenize成为input_ids。
+处理的时候，`<|image_pad|>`会被扩展成`t_grid * w_grid // MERGE_SIZE * h_grid // MERGE_SIZE`个`<|image_pad|>`，最后tokenize成为input_ids。
 
 最终我们拿到
-- `[B, seqlen]`的`input_ids`
-- `[n*t_grid*w_grid*h_gird, channel*temporal*w*h]`的`pixel_value`
-- `[n, 3]`的`grid_thw`
+- `input_ids`: `[B, seqlen]`
+- `pixel_value`: `[n*t_grid*w_grid*h_gird, channel*temporal*w*h]`
+- `grid_thw`: `[n, 3]`
 其中n为图片个数，注意根据`grid_thw`我们可以知道`pixel_value`中每个patch对应哪一张图片的哪一个位置，这对我们后面计算二维ROPE很有用
 
 ## prepare_inputs_for_genration
