@@ -7,13 +7,13 @@
 	- [Windows系统VSCode C/C++开发环境配置指南](VSCode4CppOnWindows.md)
 - 系统/系统软件
 	- [Linux相关问题](Linux.md)
+	- [CUDA](addmm.md)
 - 大语言模型
 	- [Qwen2VL](Qwen2VLForConditionalGeneration.md)
 - 网络
-- Web
+- 编程语言
 	- [HTML](html.md)
 	- [CSS](css.md)
-- 编程语言
 - 硬件
 	- [Jetson Nano启动和连接](jetson_nano.md)
 - 旅行
