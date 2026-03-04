@@ -242,7 +242,8 @@
     '" |& tee "$LOG_DIR/remote_run_$(date +%Y%m%d_%H%M%S).log"
     ```
 
-## MLLM Context
+## MLLM QNN 基础设施一览
+### MLLM Context
 context 负责维护线程池、内存管理器、各个后端的调度器，是推理引擎的单例全局入口
 
 - 线程池：在 `session_threads_` 中维护 `system_tid` 到 `SessionTCB_ptr` 的映射；
@@ -252,7 +253,7 @@ context 负责维护线程池、内存管理器、各个后端的调度器，是
     - `Dispatcher`: 虚基类，不同的后端继承它，基于 `DispatcherManager` 的 `thread_pool_` 构造，实现 `receive`、`process`、以及 `asyncReceive`等方法
 - 后端列表 `backends_`：维护所有注册进来的，不同设备的 `backend`
 
-## QNN Backend
+### QNN Backend
 
 Backend本身是各个计算平台的抽象，用于create出不同计算平台的算子，它是一个注册工厂的设计模式，初始化的时候使用 `regOpFactory` 来注册各个工厂，形成一个[opName -> opFactory]的映射。
 可以调用 `createOp` 来根据opName找到对应的工厂并create算子，不同的后端（cuda，cpu，QNN）可以有单独的一套factories。每个Backend还有一个allocator实例，保存这个设备上的专用allocator。
@@ -268,7 +269,7 @@ QNN Backend 在构造的时候，会使用 `QNNAllocator`，这是使用QNN的 `
 
 最后，它还包含一个 `QNNPerf` ，它通过QNN Interface里面的 `deviceGetInfrastructure` 拿到一个deviceInfra，然后拿到QNN perf管理的interface，之后通过它来设置各种设备性能。比如功耗模式、sleep latency等等，可参考Hexagon SDK的文档。
 
-## QNN Runtime
+### QNN Runtime
 
 每个QNN Backend有一个QNN Runtime实例 `runtime_`，可以通过它来调用QNN SDK中的各种方法。QNN 用法可以参考[QNN文档](https://docs.qualcomm.com/doc/80-63442-10/topic/api_overview.html)
 
@@ -287,7 +288,7 @@ QNN runtime可以创建或者加载QNN context，这是QNN SDK中负责管理图
 2. 用 `contextCreateFromBinary`，在QNN的device和backend上创建该QNN Context，拿到QNN Context的句柄。
 3. 最后用QNN context以及之前提取的context元信息来dump出一份图数据，构造出MLLM里面的QNNModel结构，保存在QNN Backend里面的 `qnnModels_`。每个QNNModel记录了QNN框架里面的的model句柄以及input/output Tensor的信息。
 
-## QNNModel
+### QNNModel
 
 `QNNModel` 是MLLM里面管理QNN Model的类，可以理解为对QNN Model的一层自定义封装。它主要包含QNN框架的interface入口、QNN backend句柄、计算图的句柄、图名、以及输入输出tensor的wrapper（`QNNTensorWrapper`）。在 `runtime_` 进行 `retrieveContext` 的时候，会先使用 `copyMetadataToGraphsInfo` 来把计算图元数据转储到MLLM自定义的图元数据结构 `GraphInfo_t` 中，然后使用再用QNN Interface的 `graphRetrieve`获取graph句柄，最后利用graph句柄、graph元数据，一张一张地使用 `initializeFromContext` 来构造 `QNNModel`.
 
@@ -296,7 +297,7 @@ QNN runtime可以创建或者加载QNN context，这是QNN SDK中负责管理图
 2. 加载图输入输出张量信息，设置input/output的tensorWrapper
 3. 设置 `is_finalize` 状态。
 
-## QNNTensorWrapper
+### QNNTensorWrapper
 
 MLLM里面使用QNNTensorWrapper来对QNN的tensor进行封装和管理。里面主要有一个QNN原生的 `qnnTensor_` 字段，一个 `name_`，和一个 `dimensions_` 字段。`QNNTensorWrapper` 还有一个 `Tensor` 类型的 `dataContainer_`, 用来存储张量的数据内容。 
 
@@ -304,9 +305,42 @@ MLLM里面使用QNNTensorWrapper来对QNN的tensor进行封装和管理。里面
 
 MLLM实现 `QNNWrapper::alloc` 的时候，还考虑了缓存句柄的策略，同一个内存指针可以对应不同的mem句柄，这是由于图切换导致的，比如kv cache在prefill（s32）和decode（s1）之间切换。具体做法是用一个map，再次alloc时先找map，找到就复用，不再再注册。
 
-## QNNDispatcher
+### QNNDispatcher
 
-这个结构维护了一个线程池，可以并发执行算子/图执行任务。它的异步并发功能使用了 `stdexec`，在CPU侧执行线程调度，最终会去执行 `process` 函数。在QNN后端，基本上都是做的图推理，这个 `process` 会调用 `Backend::graphExecute` 函数，在这里面完成运行时input/output张量的数据和Wrapper的绑定，和QNN HTP后端共享内存空间的注册（直接`_setContainer`+ `alloc`，后者发现已经有dataContainer的时候会直接执行注册）、以及通过 `qnnInterface` 调用 `graphExecute` API 完成图执行。(思考：Hexagon SDK 中说，NPU后端有4个硬件线程，并且有RTOS负责NPU的线程调度。那边还有rpcQueue机制，这些是否可以用来优化现有流程？)
+这个结构维护了一个线程池，可以并发执行算子/图执行任务。它的异步并发功能使用了 `stdexec`，在CPU侧执行线程调度，最终会去执行 `process` 函数。在QNN后端，基本上都是做的图推理，这个 `process` 会调用 `Backend::graphExecute` 函数，在这里面完成运行时input/output张量的数据和Wrapper的绑定，和QNN HTP后端共享内存空间的注册（直接`_setContainer`+ `alloc`，后者发现已经有dataContainer的时候会直接执行注册）、以及通过 `qnnInterface` 调用 `graphExecute` API 完成图执行。
+
+(思考：Hexagon SDK 中说，NPU后端有4个硬件线程，并且有RTOS负责NPU的线程调度。那边还有rpcQueue机制，这些是否可以用来优化现有流程？QNN 有 execution environment 选项可做 backend-allocated I/O（POPULATE_CLIENT_BUFS），或许也会有点作用，比如复用一块outputTensor)
+
+## MLLM QNN Qwen3模型建模
+
+### Qwen3 Tokenizer
+
+Qwen3使用了经典的BPE分词器。它在模型仓库里定义了一个 `tokenizer.json`，包含 `model.vocab` 和 `model.merges`，前者是token到id的映射，后者是各种bigram的rank，rank越小词频越高。BPE分词是一种贪心的分词方式，首先寻找句子中rank最小的bigram，然后合并，再对合并后的句子继续贪心分词，直到无法合并或者只剩一个词元。
+
+在实现上，`Qwen3Tokenizer`使用 `convertMessage` 方法，先提取special tokens，对其余的token用bpe进行分词，最后look up词表找到对应的id，形成input_ids返回。
+
+### KV Cache
+
+在MLLM里，KV cache的管理是通过 `KVCacheManager` 来实现的，这个结构包含了一个 `k_cache_` 和一个 `v_cache_`，它们都是 `std::vector<KVCache>`结构，每一层都对应一个 `KVCache`。这每一层的 `KVCache` 本质上是两个由 `Allocator` 分配的数组 `buffer` 和 `out_buffer`，字节数分别为 `max_cache_length * num_head * head_dim * sizeof T` 和 `max_ar_length * num_head * head_dim * sizeof T`。这两个buffer分别表示当前计算块前面的KV cache，以及当前计算块本身计算出的KV cache。`max_cache_length = context_length - min(prefill_chunk_size, decode_chunk_size)`.
+
+在 `KVCacheManager` 初始化的时候，会按照config的层数确定KV cache个数，然后给每一层的KV cache分配空间。这个分配是通过Allocator完成的。__注意这里似乎并没有注册shared memory__，真正的register发生在run time。
+
+### PromptProcessor
+
+`PromptProcessor` 这个结构专门用来以chunk的方法做prefill，它里面保存了一个prefill的图名以及一个MLLM层自定义的 `nn::Module`。在AoT的时候，这个Module可以就当成一个图名的路由表，通过它的 `operator()`方法，可以调用到Dispatcher的 `submit`，最后调用到 `backend->executeGraph`，然后通过图名找出要执行的 `QNN Model`，拿出句柄，最后通过QNN Interface的 `graphExecute` 来执行。
+
+`PromptProcessor` 在执行之前，会先调用 `init_io` 方法，这个方法会让他分配好所有输入输出向量的空间供运行时写入。这些向量分配好之后都保存在它的 `input_tensors_` 和 `output_tensors_` 里。 `init_io` 分为几个步骤：
+1. `input_tensors`, 共有 `3 + num_layers * 2` 个：
+    1. `input_ids`，形状为 `[1, ar_len]`，int32，kQNN，执行alloc。
+    2. `position_ids`，形状为 `[ar_len]`，int32，kQNN，执行alloc。
+    3. `attention_mask`，形状为 `[1, 1, ar_len, context_len]`，uint16, kQNN，执行alloc。
+    4. `kv cache`，这里对每一层的kv都分别搞了一个empty tensor，数据类型由config决定，kQNN。对于K，形状为 `[1, num_heads, head_dims, context_len - ar_len]`，对于V，形状为 `[1, num_heads, context_len - ar_len, head_dims]`，但是没有再分配内存，直接复用了`KVCacheManager`初始化时给每一层`KVCache`分配的内存（`buffer`而不是`out_buffer`）。现在相当于一块 `buffer` 内存既有 `KVCacheManager` 里面的壳子，又有这里input_tensors的壳子。
+2. `output_tensors`，共有 `1 + num_layers * 2` 个:
+    1. `logits`，形状为 `[1, 1, ar_len, vocab_size]`，uint16, kQNN，执行alloc。
+    2. `kv cache`，同input tensors的处理，不过这里每一层的K形状为 `[1, num_heads, head_dims, ar_len]`，V形状为 `[1, num_heads, ar_len, head_dims]`，并且绑定在之前对应层 `KVCache` 的 `output_buffer` 上.
+
+这里K和V的形状转置一下是合理的，由 attention 公式：$O = softmax(\frac{QK^T}{\sqrt{d}})V$。这里将K转置过来有利于kernel高效按行读取内存。
+   
 
 ## QNN API 表
 
